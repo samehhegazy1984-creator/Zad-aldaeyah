@@ -1,0 +1,6 @@
+{
+  "name": "زاد الداعية | Zad Al-Da'iyah",
+  "description": "منصة إسلامية معرفية حديثة لإعداد المحتوى التربوي والدعوي - من الفكرة إلى الكلمة النافعة",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

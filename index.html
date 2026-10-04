@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+    <title>زاد الداعية | من الفكرة إلى الكلمة النافعة</title>
+    <meta name="description" content="منصة إسلامية معرفية حديثة لإعداد المحتوى التربوي والدعوي والخطب والمواعظ. من الفكرة إلى الكلمة النافعة." />
+    <meta property="og:title" content="زاد الداعية | من الفكرة إلى الكلمة النافعة" />
+    <meta property="og:description" content="منصة إسلامية معرفية حديثة لإعداد المحتوى التربوي والدعوي والخطب والمواعظ. من الفكرة إلى الكلمة النافعة." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=Tajawal:wght@300;400;500;700&display=swap" rel="stylesheet" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230B1B2B'/><path d='M16 6 L22 12 L16 18 L10 12 Z' fill='%23C8A962'/><path d='M16 14 L22 20 L16 26 L10 20 Z' fill='%23C8A962' fill-opacity='0.6'/></svg>" />
+    <script>
+      (function() {
+        try {
+          var pref = localStorage.getItem('zad_theme_preference') || 'system';
+          var resolved = pref;
+          if (pref === 'system') {
+            resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          }
+          if (resolved === 'dark') {
+            document.documentElement.classList.add('dark');
+          } else {
+            document.documentElement.classList.remove('dark');
+          }
+          document.documentElement.setAttribute('data-theme', resolved);
+          document.documentElement.setAttribute('data-theme-preference', pref);
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body class="bg-stone-50 text-stone-900 dark:bg-[#070e17] dark:text-stone-100 transition-colors duration-200 antialiased selection:bg-[#c8a962]/20 selection:text-[#0b1b2b] dark:selection:text-[#c8a962]">
+    <div id="root"></div>
+    <script src="/env.js"></script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
