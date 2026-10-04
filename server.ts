@@ -1,12 +1,14 @@
 import express, { Request, Response } from 'express';
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
 import {
   ISLAMIC_AI_SYSTEM_INSTRUCTIONS,
   buildGenerationPrompt,
   buildEditPrompt,
+  buildEnhanceArticlePrompt,
 } from './src/lib/ai/prompts';
 import {
   validateGenerationParams,
@@ -37,30 +39,39 @@ function getGeminiClient(): GoogleGenAI | null {
 // API ROUTES
 // ==========================================
 
+// Cloud Run & Monitoring Health Check
+app.get('/health', (_req: Request, res: Response) => {
+  res.status(200).json({ status: 'ok' });
+});
+
+const DEFAULT_SUPABASE_URL = 'https://mnsorzmvnfkqsqbnjwgx.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_1h-o1nD5KU_IgA-dIlBidw_8mgoPylK';
+
 // Safe public client config script (Supabase client keys only, NEVER secrets)
 app.get('/env.js', (_req: Request, res: Response) => {
   res.type('application/javascript');
   res.send(
     `window.__ENV__ = ${JSON.stringify({
-      SUPABASE_URL: process.env.SUPABASE_URL || '',
-      SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY || '',
+      SUPABASE_URL: process.env.SUPABASE_URL || DEFAULT_SUPABASE_URL,
+      SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY,
     })};`
   );
 });
 
 // Config / Health check route
 app.get('/api/config', (_req: Request, res: Response) => {
+  const supabaseUrl = process.env.SUPABASE_URL || DEFAULT_SUPABASE_URL;
+  const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
+
   const hasGemini = Boolean(
     process.env.GEMINI_API_KEY &&
     !process.env.GEMINI_API_KEY.includes('MY_GEMINI')
   );
   const hasSupabaseUrl = Boolean(
-    process.env.SUPABASE_URL &&
-    !process.env.SUPABASE_URL.includes('MY_SUPABASE')
+    supabaseUrl && !supabaseUrl.includes('MY_SUPABASE')
   );
   const hasSupabaseAnonKey = Boolean(
-    process.env.SUPABASE_ANON_KEY &&
-    !process.env.SUPABASE_ANON_KEY.includes('MY_KEY')
+    supabaseAnonKey && !supabaseAnonKey.includes('MY_KEY')
   );
   const hasSupabase = hasSupabaseUrl && hasSupabaseAnonKey;
 
@@ -70,8 +81,8 @@ app.get('/api/config', (_req: Request, res: Response) => {
     hasSupabase,
     hasSupabaseUrl,
     hasSupabaseAnonKey,
-    supabaseUrl: hasSupabaseUrl ? process.env.SUPABASE_URL : '',
-    supabaseAnonKey: hasSupabaseAnonKey ? process.env.SUPABASE_ANON_KEY : '',
+    supabaseUrl,
+    supabaseAnonKey,
     dailyLimit: 10,
     model: 'gemini-3.8-flash',
   });
@@ -217,6 +228,88 @@ app.post('/api/ai/edit', async (req: Request, res: Response) => {
   }
 });
 
+// Enhance & Expand Existing Article Endpoint
+app.post('/api/ai/enhance-article', async (req: Request, res: Response) => {
+  try {
+    const {
+      originalArticle,
+      mode,
+      length,
+      detailLevel,
+      tashkeel,
+      evidenceLevel,
+      targetAudience,
+      customInstructions,
+    } = req.body;
+
+    if (!originalArticle || !originalArticle.title) {
+      return res.status(400).json({
+        success: false,
+        error: 'بيانات المقال الأصلي المراد تطويره غير مكتملة',
+      });
+    }
+
+    const ai = getGeminiClient();
+    if (!ai) {
+      return res.status(503).json({
+        success: false,
+        error: 'مفتاح GEMINI_API_KEY غير متوفر في بيئة الخادم. يرجى ضبطه لتفعيل التطوير التحريري.',
+      });
+    }
+
+    const prompt = buildEnhanceArticlePrompt({
+      originalArticle,
+      mode: mode || 'expand_enrich',
+      length: length || 'شاملة',
+      detailLevel: detailLevel || 'شامل',
+      tashkeel: tashkeel || 'تشكيل كامل',
+      evidenceLevel: evidenceLevel || 'توثيق موسع',
+      targetAudience,
+      customInstructions,
+    });
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.8-flash',
+      contents: prompt,
+      config: {
+        systemInstruction: ISLAMIC_AI_SYSTEM_INSTRUCTIONS,
+        temperature: 0.4,
+        maxOutputTokens: 8192,
+        responseMimeType: 'application/json',
+      },
+    });
+
+    const responseText = response.text || '';
+    const structuredResult = cleanAndParseAIJson(responseText);
+
+    structuredResult.id = `gen-enh-${Date.now()}`;
+    structuredResult.createdAt = new Date().toISOString();
+
+    return res.json({
+      success: true,
+      data: structuredResult,
+      metadata: {
+        enhancedFromId: originalArticle.id,
+        mode: mode || 'expand_enrich',
+        model: 'gemini-3.8-flash',
+      },
+    });
+  } catch (error: any) {
+    console.error('Error in /api/ai/enhance-article:', error);
+    const msg = error?.message || '';
+    let userFriendlyError = 'حدث خطأ أثناء تطوير وتوسيع المقال. يرجى المحاولة مرة أخرى.';
+    if (msg.includes('leaked') || msg.includes('reported as leaked')) {
+      userFriendlyError = 'مفتاح GEMINI_API_KEY غير صالح أو تم الإبلاغ عن تسريبه سابقاً.';
+    } else if (msg.includes('Quota exceeded') || msg.includes('RESOURCE_EXHAUSTED')) {
+      userFriendlyError = 'تم استهلاك الحصة المجانية لمفتاح Gemini مؤقتاً. يرجى المحاولة لاحقاً.';
+    }
+    return res.status(500).json({
+      success: false,
+      error: userFriendlyError,
+    });
+  }
+});
+
 // Admin Writing Assistant Endpoint (Server-side Gemini proxy)
 app.post('/api/admin/ai-assist', async (req: Request, res: Response) => {
   try {
@@ -291,23 +384,42 @@ ${text || topic}
 // ==========================================
 
 async function startServer() {
-  if (!isProd) {
+  const distPath = path.resolve(process.cwd(), 'dist');
+  const hasDist = fs.existsSync(path.resolve(distPath, 'index.html'));
+
+  const isProduction =
+    process.env.BUILD_TARGET === 'production' ||
+    process.env.NODE_ENV === 'production' ||
+    (hasDist && process.env.NODE_ENV !== 'development');
+
+  if (isProduction) {
+    console.log(`[Zad Al-Da'iyah] Serving production static assets from: ${distPath}`);
+    app.use(express.static(distPath));
+    app.get('*', (_req: Request, res: Response) => {
+      res.sendFile(path.resolve(distPath, 'index.html'));
+    });
+  } else {
+    console.log(`[Zad Al-Da'iyah] Starting development Vite middleware...`);
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
     });
     app.use(vite.middlewares);
-  } else {
-    const distPath = path.resolve(__dirname, 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (_req, res) => {
-      res.sendFile(path.resolve(distPath, 'index.html'));
-    });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`[Zad Al-Da'iyah] Server running on http://0.0.0.0:${PORT}`);
+  const server = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`[Zad Al-Da'iyah] Starting Zad Al-Da'iyah production server...`);
+    console.log(`[Zad Al-Da'iyah] Listening on port: ${PORT} (0.0.0.0)`);
+    console.log(`[Zad Al-Da'iyah] Health check ready at http://0.0.0.0:${PORT}/health`);
+  });
+
+  // Graceful shutdown for Cloud Run container lifecycle
+  process.on('SIGTERM', () => {
+    console.log(`[Zad Al-Da'iyah] Received SIGTERM signal, closing server gracefully...`);
+    server.close(() => {
+      process.exit(0);
+    });
   });
 }
 

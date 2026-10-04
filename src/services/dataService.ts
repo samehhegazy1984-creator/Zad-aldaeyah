@@ -2,6 +2,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase/client';
 import {
   AIGenerationParams,
   AIEditActionParams,
+  AIEnhanceArticleParams,
   GeneratedContentResult,
   SavedGeneration,
 } from '../lib/ai/types';
@@ -272,6 +273,37 @@ export async function editIslamicContentAPI(
     return {
       success: false,
       error: 'تعذر إجراء التعديل على المادة. يرجى المحاولة مرة أخرى.',
+    };
+  }
+}
+
+export async function enhanceArticleAPI(
+  params: AIEnhanceArticleParams,
+  userId?: string
+): Promise<{ success: boolean; data?: GeneratedContentResult; error?: string }> {
+  try {
+    const res = await fetch('/api/ai/enhance-article', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ ...params, userId }),
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      return {
+        success: false,
+        error: data.error || data.message || 'حدث خطأ أثناء تطوير وتوسيع المقال',
+      };
+    }
+
+    return { success: true, data: data.data };
+  } catch (err: any) {
+    console.error('Enhance article request failed:', err);
+    return {
+      success: false,
+      error: 'تعذر الاتصال بخادم الذكاء الاصطناعي لتطوير المقال. يرجى التحقق من الاتصال.',
     };
   }
 }

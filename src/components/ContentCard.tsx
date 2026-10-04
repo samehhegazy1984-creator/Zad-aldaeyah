@@ -57,6 +57,16 @@ export const ContentCard: React.FC<ContentCardProps> = ({
             <span className="px-2 py-0.5 rounded-md bg-stone-100 dark:bg-stone-800/80 text-stone-600 dark:text-stone-300 text-[11px] font-medium">
               {item.contentType}
             </span>
+            {item.hasTashkeel && (
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 dark:bg-amber-950/50 text-[#94762e] dark:text-[#dfc27e] border border-amber-200/60 dark:border-amber-900/50">
+                مشكول
+              </span>
+            )}
+            {item.qualityScore && (
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-900/50">
+                ★ {item.qualityScore.overall.toFixed(1)}
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-1">

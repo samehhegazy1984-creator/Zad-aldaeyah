@@ -48,6 +48,51 @@ export interface Author {
   avatar?: string;
 }
 
+export interface ContentSection {
+  heading: string;
+  subheading?: string;
+  content: string;
+  dimension?: string;
+  ayahs?: {
+    text: string;
+    surah: string;
+    number?: number;
+    explanation?: string;
+  }[];
+  hadiths?: {
+    text: string;
+    narrator: string;
+    source?: string;
+    grade?: string;
+    explanation?: string;
+  }[];
+  salafQuotes?: {
+    scholar: string;
+    statement: string;
+    source?: string;
+    era?: string;
+  }[];
+  propheticEvents?: {
+    incident: string;
+    lesson: string;
+    context?: string;
+  }[];
+}
+
+export interface ContentQualityScore {
+  overall: number;
+  depth: number;
+  completeness: number;
+  quranEvidence: number;
+  hadithEvidence: number;
+  salafEvidence: number;
+  structure: number;
+  arabicQuality: number;
+  tashkeelAccuracy: number;
+  practicalUsefulness: number;
+  summaryNotes?: string;
+}
+
 export interface Content {
   id: string;
   title: string;
@@ -64,9 +109,35 @@ export interface Content {
   date: string;
   views: number;
   createdAt: string;
+  subtitle?: string;
+  conceptDefinition?: string;
+  sections?: ContentSection[];
+  propheticEvents?: {
+    incident: string;
+    lesson: string;
+    context?: string;
+  }[];
+  salafQuotes?: {
+    scholar: string;
+    statement: string;
+    source?: string;
+    era?: string;
+  }[];
+  misconceptions?: {
+    claim: string;
+    correction: string;
+    evidence?: string;
+  }[];
+  practicalApplications?: string[];
+  reflectionQuestions?: string[];
+  conclusion?: string;
+  dua?: string;
+  qualityScore?: ContentQualityScore;
+  wordCount?: number;
+  hasTashkeel?: boolean;
   references?: string[];
-  ayahQuotes?: { text: string; surah: string }[];
-  hadithQuotes?: { text: string; narrator: string }[];
+  ayahQuotes?: { text: string; surah: string; explanation?: string }[];
+  hadithQuotes?: { text: string; narrator: string; source?: string; explanation?: string }[];
   keyTakeaways?: string[];
   status?: 'draft' | 'under_review' | 'published' | 'archived';
   seoTitle?: string;

@@ -1,7 +1,10 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
+const DEFAULT_SUPABASE_URL = 'https://mnsorzmvnfkqsqbnjwgx.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_1h-o1nD5KU_IgA-dIlBidw_8mgoPylK';
+
 // Safe environment variable resolution
-const getEnvVar = (key: string): string => {
+const getEnvVar = (key: string, fallback: string = ''): string => {
   if (typeof window !== 'undefined' && (window as any).__ENV__?.[key]) {
     return (window as any).__ENV__[key];
   }
@@ -10,11 +13,11 @@ const getEnvVar = (key: string): string => {
     if (import.meta.env[`VITE_${key}`]) return import.meta.env[`VITE_${key}`];
     if (import.meta.env[key]) return import.meta.env[key];
   }
-  return '';
+  return fallback;
 };
 
-export const SUPABASE_URL = getEnvVar('SUPABASE_URL');
-export const SUPABASE_ANON_KEY = getEnvVar('SUPABASE_ANON_KEY');
+export const SUPABASE_URL = getEnvVar('SUPABASE_URL', DEFAULT_SUPABASE_URL);
+export const SUPABASE_ANON_KEY = getEnvVar('SUPABASE_ANON_KEY', DEFAULT_SUPABASE_ANON_KEY);
 
 export const isSupabaseConfigured = Boolean(
   SUPABASE_URL &&

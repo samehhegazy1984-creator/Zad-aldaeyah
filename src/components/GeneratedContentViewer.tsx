@@ -16,6 +16,16 @@ import {
   AlertTriangle,
   Layers,
   ChevronDown,
+  ChevronUp,
+  Award,
+  CheckCircle2,
+  ShieldCheck,
+  Compass,
+  Lightbulb,
+  FileText,
+  HelpCircle,
+  Scroll,
+  HeartHandshake,
 } from 'lucide-react';
 import { GeneratedContentResult, AIGenerationParams, AIEditActionParams } from '../lib/ai/types';
 import { editIslamicContentAPI, saveGeneratedMaterial } from '../services/dataService';
@@ -45,6 +55,7 @@ export const GeneratedContentViewer: React.FC<GeneratedContentViewerProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [editingAction, setEditingAction] = useState<string | null>(null);
   const [showTashkeel, setShowTashkeel] = useState(true);
+  const [isQualityScoreOpen, setIsQualityScoreOpen] = useState(false);
 
   const stripTashkeel = (text: string) => {
     return text.replace(/[\u0617-\u061A\u064B-\u0652]/g, '');
@@ -56,9 +67,13 @@ export const GeneratedContentViewer: React.FC<GeneratedContentViewerProps> = ({
   };
 
   const calculateWordCount = () => {
+    if (content.wordCount) return content.wordCount;
     const allText = `${content.title} ${content.introduction} ${content.sections.map((s) => s.heading + ' ' + s.content).join(' ')} ${content.conclusion} ${content.dua || ''}`;
     return allText.trim().split(/\s+/).filter(Boolean).length;
   };
+
+  const wordCount = calculateWordCount();
+  const readingTimeMinutes = Math.max(1, Math.ceil(wordCount / 200));
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -90,26 +105,65 @@ export const GeneratedContentViewer: React.FC<GeneratedContentViewerProps> = ({
   const handleCopy = (withTashkeel = true) => {
     const formatPiece = (str?: string) => (str ? (withTashkeel ? str : stripTashkeel(str)) : '');
 
-    let fullText = `${formatPiece(content.title)}\nنوع المادة: ${content.contentType} | الجمهور: ${content.audience} | المدة: ${content.estimatedDuration}\n\n`;
+    let fullText = `${formatPiece(content.title)}\n`;
+    if (content.subtitle) fullText += `${formatPiece(content.subtitle)}\n`;
+    fullText += `نوع المادة: ${content.contentType} | الجمهور: ${content.audience} | المدة: ${content.estimatedDuration} | الكلمات: ~${wordCount}\n\n`;
+
+    if (content.conceptDefinition) {
+      fullText += `تحرير المفهوم:\n${formatPiece(content.conceptDefinition)}\n\n`;
+    }
+
     fullText += `المقدمة:\n${formatPiece(content.introduction)}\n\n`;
 
     content.sections.forEach((sec, idx) => {
-      fullText += `${idx + 1}. ${formatPiece(sec.heading)}\n${formatPiece(sec.content)}\n`;
+      fullText += `${idx + 1}. ${formatPiece(sec.heading)}\n`;
+      if (sec.subheading) fullText += `(${formatPiece(sec.subheading)})\n`;
+      fullText += `${formatPiece(sec.content)}\n\n`;
+
       if (sec.ayahs?.length) {
         sec.ayahs.forEach((a) => {
-          fullText += `﴿${formatPiece(a.text)}﴾ [${a.surah}${a.number ? `: ${a.number}` : ''}]\n`;
+          fullText += `« ﴿ ${formatPiece(a.text)} ﴾ » [سورة ${a.surah}${a.number ? `: ${a.number}` : ''}]\n`;
+          if (a.explanation) fullText += `  بيان الدلالة: ${formatPiece(a.explanation)}\n`;
         });
+        fullText += '\n';
       }
+
       if (sec.hadiths?.length) {
         sec.hadiths.forEach((h) => {
-          fullText += `حديث: «${formatPiece(h.text)}» (${h.narrator ? h.narrator + ' - ' : ''}${h.source || ''})\n`;
+          fullText += `حديث: « ${formatPiece(h.text)} » (${h.narrator ? h.narrator + ' - ' : ''}${h.source || ''})\n`;
+          if (h.explanation) fullText += `  فقه الحديث: ${formatPiece(h.explanation)}\n`;
         });
+        fullText += '\n';
       }
-      fullText += '\n';
+
+      if (sec.salafQuotes?.length) {
+        sec.salafQuotes.forEach((sq) => {
+          fullText += `أثر: « ${formatPiece(sq.statement)} » [${sq.scholar}${sq.source ? ` - ${sq.source}` : ''}]\n`;
+        });
+        fullText += '\n';
+      }
+
+      if (sec.propheticEvents?.length) {
+        sec.propheticEvents.forEach((pe) => {
+          fullText += `من السيرة: ${formatPiece(pe.incident)}\n  العبرة: ${formatPiece(pe.lesson)}\n`;
+        });
+        fullText += '\n';
+      }
     });
 
+    if (content.misconceptions?.length) {
+      fullText += `معالجة المفاهيم الشائعة:\n`;
+      content.misconceptions.forEach((m) => {
+        fullText += `- الخطأ: ${formatPiece(m.claim)}\n  التصحيح: ${formatPiece(m.correction)}\n  الدليل: ${formatPiece(m.evidence || '')}\n\n`;
+      });
+    }
+
     if (content.practicalApplications?.length) {
-      fullText += `التطبيقات العملية:\n${content.practicalApplications.map((app) => `- ${formatPiece(app)}`).join('\n')}\n\n`;
+      fullText += `الجانب العملي والتطبيقي:\n${content.practicalApplications.map((app) => `- ${formatPiece(app)}`).join('\n')}\n\n`;
+    }
+
+    if (content.reflectionQuestions?.length) {
+      fullText += `أسئلة التدبر والنقاش:\n${content.reflectionQuestions.map((q) => `؟ ${formatPiece(q)}`).join('\n')}\n\n`;
     }
 
     if (content.conclusion) {
@@ -124,7 +178,7 @@ export const GeneratedContentViewer: React.FC<GeneratedContentViewerProps> = ({
       fullText += `المراجع:\n${content.references.join('\n')}\n\n`;
     }
 
-    fullText += `تم إعدادها عبر منصة زاد الداعية`;
+    fullText += `منصة زاد الداعية: من الفكرة إلى الكلمة النافعة`;
 
     if (navigator.clipboard) {
       navigator.clipboard.writeText(fullText).then(() => {
@@ -147,7 +201,7 @@ export const GeneratedContentViewer: React.FC<GeneratedContentViewerProps> = ({
         })
         .catch(() => {});
     } else {
-      handleCopy();
+      handleCopy(showTashkeel);
     }
   };
 
@@ -212,18 +266,30 @@ export const GeneratedContentViewer: React.FC<GeneratedContentViewerProps> = ({
     }
   };
 
-  const quickActions: { id: AIEditActionParams['actionType']; label: string }[] = [
-    { id: 'summarize', label: 'اختصر المادة' },
-    { id: 'expand', label: 'وسّع الشرح' },
-    { id: 'simplify', label: 'بسّط اللغة' },
-    { id: 'eloquent', label: 'اجعلها أفصح' },
-    { id: 'add_examples', label: 'أضف أمثلة واقعية' },
-    { id: 'add_applications', label: 'أضف خطوات عملية' },
-    { id: 'convert_to_post', label: 'حوّل إلى منشور' },
-    { id: 'convert_to_script', label: 'حوّل لسيناريو فيديو' },
-    { id: 'discussion_questions', label: 'أسئلة نقاش' },
-    { id: 'weekly_plan', label: 'خطة أسبوعية' },
+  const derivativeActions: { id: AIEditActionParams['actionType']; label: string }[] = [
+    { id: 'convert_to_khutbah', label: 'تحويل إلى خطبة جمعة' },
+    { id: 'convert_to_lesson', label: 'تحويل إلى درس علمي منهجي' },
+    { id: 'convert_to_social_series', label: 'سلسلة منشورات دعوية' },
+    { id: 'convert_to_post', label: 'منشور رقمي مكثف' },
+    { id: 'convert_to_script', label: 'سيناريو فيديو مرئي' },
+    { id: 'convert_to_discussion', label: 'أسئلة نقاش للحلقات' },
+    { id: 'convert_to_family_activity', label: 'نشاط أسري تطبيقي' },
+    { id: 'convert_to_action_plan', label: 'خطة عمل أسبوعية' },
   ];
+
+  const editorialActions: { id: AIEditActionParams['actionType']; label: string }[] = [
+    { id: 'add_ayahs', label: 'إضافة أدلة قرآنية' },
+    { id: 'add_hadiths', label: 'إضافة أحاديث محققة' },
+    { id: 'add_seerah', label: 'إضافة شواهد السيرة' },
+    { id: 'expand_salaf', label: 'إضافة أقوال السلف' },
+    { id: 'tashkeel_review', label: 'مراجعة وضبط التشكيل' },
+    { id: 'linguistic_review', label: 'تدقيق لغوي ونحوي' },
+    { id: 'sharia_review', label: 'مراجعة التوثيق الشرعي' },
+    { id: 'expand', label: 'توسيع الشرح والتحليل' },
+    { id: 'summarize', label: 'اختصار وتركيز' },
+  ];
+
+  const quality = content.qualityScore;
 
   return (
     <div className="min-h-screen py-8 lg:py-12 bg-[#faf8f5] dark:bg-[#070e17] text-[#0b1b2b] dark:text-stone-100 transition-colors">
@@ -240,10 +306,10 @@ export const GeneratedContentViewer: React.FC<GeneratedContentViewerProps> = ({
         <div className="flex items-center justify-between gap-4 mb-6 no-print">
           <button
             onClick={onBackToWizard}
-            className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-stone-600 dark:text-stone-300 hover:text-[#0b1b2b] dark:hover:text-white cursor-pointer"
+            className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-stone-600 dark:text-stone-400 hover:text-[#0b1b2b] dark:hover:text-white cursor-pointer"
           >
             <ArrowRight className="w-4 h-4" />
-            <span>العودة لإعدادات المساعد</span>
+            <span>العودة لإعداد مادة جديدة</span>
           </button>
 
           <button
@@ -258,7 +324,7 @@ export const GeneratedContentViewer: React.FC<GeneratedContentViewerProps> = ({
         <div className="mb-6 p-4 rounded-2xl bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs sm:text-sm flex items-center gap-3">
           <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
           <span>
-            المحتوى المولّد بالذكاء الاصطناعي يحتاج إلى مراجعة الأدلة والنقول قبل النشر أو الإلقاء.
+            المحتوى مولَّد بالذكاء الاصطناعي، ويُنصح بمراجعته علميًّا ولغويًّا قبل النشر، ولا سيما الآيات والأحاديث والنقول.
           </span>
         </div>
 
@@ -345,8 +411,72 @@ export const GeneratedContentViewer: React.FC<GeneratedContentViewerProps> = ({
           <div className="mb-6 p-4 rounded-2xl bg-[#0b1b2b] text-white dark:bg-[#dfc27e] dark:text-[#0b1b2b] text-xs sm:text-sm font-semibold flex items-center justify-between shadow-lg animate-pulse">
             <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 animate-spin" />
-              <span>جارٍ تطبيق التعديل: «{editingAction}»...</span>
+              <span>جارٍ تطبيق التحويل التحريري: «{editingAction}»...</span>
             </div>
+          </div>
+        )}
+
+        {/* Quality Score Card */}
+        {quality && (
+          <div className="mb-8 p-5 sm:p-6 rounded-3xl bg-white dark:bg-[#0c1825] border border-[#c8a962]/40 shadow-xs text-right">
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-stone-100 dark:border-stone-800">
+              <div className="flex items-center gap-2.5">
+                <span className="p-2 rounded-xl bg-[#c8a962]/20 text-[#94762e] dark:text-[#dfc27e]">
+                  <Award className="w-5 h-5" />
+                </span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-sm sm:text-base font-['Cairo'] text-[#0b1b2b] dark:text-white">
+                      مؤشر الجودة التحريرية لمادة زاد الداعية
+                    </h3>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 font-bold">
+                      {quality.overall} / 10
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-stone-400 mt-0.5">
+                    تقييم تحريري غير إفتائي يقيس استيفاء الأركان الاثني عشر، الدقة اللغوية، وعمق التأصيل.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsQualityScoreOpen(!isQualityScoreOpen)}
+                className="text-xs font-semibold text-[#94762e] dark:text-[#dfc27e] flex items-center gap-1 hover:underline cursor-pointer"
+              >
+                <span>{isQualityScoreOpen ? 'إخفاء التفاصيل' : 'عرض معايير التقييم العشرة'}</span>
+                {isQualityScoreOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+            </div>
+
+            {isQualityScoreOpen && (
+              <div className="pt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 animate-in fade-in duration-200">
+                {[
+                  { label: 'عمق التناول', val: quality.depth },
+                  { label: 'استيفاء الأركان', val: quality.completeness },
+                  { label: 'التوثيق القرآني', val: quality.quranEvidence },
+                  { label: 'السنة النبوية', val: quality.hadithEvidence },
+                  { label: 'آثار السلف', val: quality.salafEvidence },
+                  { label: 'التماسك الهيكلي', val: quality.structure },
+                  { label: 'الفصاحة اللغوية', val: quality.arabicQuality },
+                  { label: 'ضبط التشكيل', val: quality.tashkeelAccuracy },
+                  { label: 'القيمة العملية', val: quality.practicalUsefulness },
+                  { label: 'المعدل العام', val: quality.overall },
+                ].map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="p-3 rounded-xl bg-stone-50 dark:bg-[#08121d] border border-stone-200/70 dark:border-stone-800 text-center"
+                  >
+                    <span className="text-[11px] text-stone-500 dark:text-stone-400 block mb-1">
+                      {item.label}
+                    </span>
+                    <span className="text-sm font-bold text-[#0b1b2b] dark:text-[#dfc27e] font-mono">
+                      {item.val} / 10
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -366,20 +496,26 @@ export const GeneratedContentViewer: React.FC<GeneratedContentViewerProps> = ({
               <span>·</span>
               <span className="flex items-center gap-1 text-stone-500 dark:text-stone-400 font-normal">
                 <Clock className="w-3.5 h-3.5" />
-                <span>{content.estimatedDuration}</span>
+                <span>مدة القراءة: {readingTimeMinutes} دقيقة</span>
               </span>
               <span>·</span>
               <span className="bg-stone-100 dark:bg-stone-800/80 px-2.5 py-0.5 rounded-full text-[11px] text-stone-600 dark:text-stone-300 font-mono">
-                ~{calculateWordCount().toLocaleString('ar-SA')} كلمة (مادة متكاملة)
+                ~{wordCount.toLocaleString('ar-SA')} كلمة (مادة متكاملة)
               </span>
             </div>
 
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold font-['Cairo'] text-[#0b1b2b] dark:text-white leading-relaxed">
               {renderText(content.title)}
             </h1>
+
+            {content.subtitle && (
+              <p className="text-sm sm:text-base font-semibold text-[#94762e] dark:text-[#dfc27e] leading-normal font-['Cairo']">
+                {renderText(content.subtitle)}
+              </p>
+            )}
           </div>
 
-          {/* Introduction */}
+          {/* 1. Introduction */}
           {content.introduction && (
             <div className="space-y-2">
               <h3 className="text-sm font-bold font-['Cairo'] text-[#94762e] dark:text-[#dfc27e] flex items-center gap-2">
@@ -392,17 +528,37 @@ export const GeneratedContentViewer: React.FC<GeneratedContentViewerProps> = ({
             </div>
           )}
 
-          {/* Sections */}
-          <div className="space-y-8 pt-4">
+          {/* 2. Concept Definition (تحرير مفهوم الموضوع) */}
+          {content.conceptDefinition && (
+            <div className="p-6 rounded-2xl bg-[#0b1b2b]/5 dark:bg-[#122438]/40 border-r-4 border-[#c8a962] space-y-2">
+              <h3 className="font-bold text-sm sm:text-base font-['Cairo'] text-[#0b1b2b] dark:text-[#dfc27e] flex items-center gap-2">
+                <Compass className="w-4 h-4 text-[#94762e] dark:text-[#dfc27e]" />
+                <span>تحرير مفهوم الموضوع لغةً واصطلاحاً ودفع اللبس:</span>
+              </h3>
+              <p className="text-base sm:text-lg leading-[2.2] text-stone-800 dark:text-stone-200 font-['Tajawal'] text-justify">
+                {renderText(content.conceptDefinition)}
+              </p>
+            </div>
+          )}
+
+          {/* 3. Sections */}
+          <div className="space-y-10 pt-4">
             {content.sections.map((section, idx) => (
               <section key={idx} className="space-y-4">
                 <div className="flex items-center gap-2.5 pb-2 border-b border-stone-100 dark:border-stone-800">
                   <span className="w-6 h-6 rounded-lg bg-[#c8a962]/15 text-[#94762e] dark:text-[#dfc27e] text-xs font-bold flex items-center justify-center font-['Cairo']">
                     {idx + 1}
                   </span>
-                  <h2 className="text-lg sm:text-xl font-bold font-['Cairo'] text-[#0b1b2b] dark:text-white">
-                    {renderText(section.heading)}
-                  </h2>
+                  <div>
+                    <h2 className="text-lg sm:text-xl font-bold font-['Cairo'] text-[#0b1b2b] dark:text-white">
+                      {renderText(section.heading)}
+                    </h2>
+                    {section.subheading && (
+                      <span className="text-xs text-stone-400 block font-normal">
+                        {renderText(section.subheading)}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <p className="text-base sm:text-lg leading-[2.3] text-stone-800 dark:text-stone-200 font-['Tajawal'] text-justify whitespace-pre-line">
@@ -420,9 +576,14 @@ export const GeneratedContentViewer: React.FC<GeneratedContentViewerProps> = ({
                         <p className="text-base sm:text-lg font-bold text-[#0b1b2b] dark:text-[#dfc27e] leading-relaxed">
                           « ﴿ {renderText(ayah.text)} ﴾ »
                         </p>
-                        <span className="text-xs text-stone-500 dark:text-stone-400 mt-1 block">
-                          [سُورَةُ {renderText(ayah.surah)}{ayah.number ? `: الآيَةُ ${ayah.number}` : ''}]
-                        </span>
+                        <div className="text-xs text-stone-500 dark:text-stone-400 mt-1 flex items-center justify-between">
+                          <span>[سُورَةُ {renderText(ayah.surah)}{ayah.number ? `: الآيَةُ ${ayah.number}` : ''}]</span>
+                        </div>
+                        {ayah.explanation && (
+                          <p className="text-xs sm:text-sm text-stone-700 dark:text-stone-300 mt-2 pt-2 border-t border-amber-200/40 dark:border-amber-900/40">
+                            <strong>بيان وجه الدلالة والتفسير:</strong> {renderText(ayah.explanation)}
+                          </p>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -444,6 +605,57 @@ export const GeneratedContentViewer: React.FC<GeneratedContentViewerProps> = ({
                           {hadith.source && <span>المصدر: {renderText(hadith.source)}</span>}
                           {hadith.grade && <span className="text-sky-700 dark:text-sky-300 font-semibold">({renderText(hadith.grade)})</span>}
                         </div>
+                        {hadith.explanation && (
+                          <p className="text-xs sm:text-sm text-stone-700 dark:text-stone-300 mt-2 pt-2 border-t border-sky-200/40 dark:border-sky-900/40">
+                            <strong>فقه الحديث ومعناه:</strong> {renderText(hadith.explanation)}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Salaf Quotes if present */}
+                {section.salafQuotes && section.salafQuotes.length > 0 && (
+                  <div className="space-y-2">
+                    {section.salafQuotes.map((sq, sqIdx) => (
+                      <div
+                        key={sqIdx}
+                        className="my-3 p-4 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/20 border-r-4 border-r-emerald-600 dark:border-r-emerald-500 border border-emerald-200/50 dark:border-emerald-900/40"
+                      >
+                        <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300 block mb-1">
+                          من درر وأقوال السلف والعلماء:
+                        </span>
+                        <p className="text-base sm:text-lg text-stone-900 dark:text-stone-100 leading-relaxed">
+                          « {renderText(sq.statement)} »
+                        </p>
+                        <div className="text-xs text-stone-500 dark:text-stone-400 mt-1.5 flex gap-2">
+                          <span className="font-semibold text-emerald-700 dark:text-emerald-300">— {renderText(sq.scholar)}</span>
+                          {sq.source && <span>({renderText(sq.source)})</span>}
+                          {sq.era && <span className="text-stone-400">[{renderText(sq.era)}]</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Prophetic Events if present */}
+                {section.propheticEvents && section.propheticEvents.length > 0 && (
+                  <div className="space-y-2">
+                    {section.propheticEvents.map((pe, peIdx) => (
+                      <div
+                        key={peIdx}
+                        className="my-3 p-4 rounded-2xl bg-purple-50/70 dark:bg-purple-950/20 border-r-4 border-r-purple-600 dark:border-r-purple-500 border border-purple-200/50 dark:border-purple-900/40"
+                      >
+                        <span className="text-xs font-bold text-purple-800 dark:text-purple-300 block mb-1">
+                          شاهد من السيرة النبوية العطرة:
+                        </span>
+                        <p className="text-base sm:text-lg text-stone-900 dark:text-stone-100 leading-relaxed font-semibold">
+                          {renderText(pe.incident)}
+                        </p>
+                        <p className="text-xs sm:text-sm text-stone-700 dark:text-stone-300 mt-2 pt-2 border-t border-purple-200/40 dark:border-purple-900/40">
+                          <strong>العبرة التربوية والحكمة النبوية:</strong> {renderText(pe.lesson)}
+                        </p>
                       </div>
                     ))}
                   </div>
@@ -452,12 +664,42 @@ export const GeneratedContentViewer: React.FC<GeneratedContentViewerProps> = ({
             ))}
           </div>
 
-          {/* Practical Applications */}
+          {/* 4. Misconceptions (معالجة الأخطاء والمفاهيم الشائعة) */}
+          {content.misconceptions && content.misconceptions.length > 0 && (
+            <div className="p-6 rounded-2xl bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200/60 dark:border-rose-900/40 space-y-4">
+              <h3 className="font-bold text-base font-['Cairo'] text-rose-900 dark:text-rose-200 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-rose-600 dark:text-rose-400" />
+                <span>معالجة المفاهيم الخاطئة والشائعة وتصحيحها:</span>
+              </h3>
+              <div className="space-y-3">
+                {content.misconceptions.map((m, mIdx) => (
+                  <div
+                    key={mIdx}
+                    className="p-3.5 rounded-xl bg-white dark:bg-[#08121d] border border-rose-200/50 dark:border-rose-900/40 text-xs sm:text-sm space-y-1.5"
+                  >
+                    <div className="text-rose-700 dark:text-rose-300 font-bold">
+                      <strong>الوهم الشائع:</strong> {renderText(m.claim)}
+                    </div>
+                    <div className="text-stone-800 dark:text-stone-200">
+                      <strong>التصحيح الشرعي:</strong> {renderText(m.correction)}
+                    </div>
+                    {m.evidence && (
+                      <div className="text-stone-500 dark:text-stone-400 text-xs">
+                        <strong>الدليل:</strong> {renderText(m.evidence)}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 5. Practical Applications («ماذا أفعل بعد أن فهمت هذا؟») */}
           {content.practicalApplications && content.practicalApplications.length > 0 && (
             <div className="p-6 rounded-2xl bg-stone-100/70 dark:bg-[#08121d] border border-stone-200 dark:border-stone-800 space-y-3">
               <h3 className="font-bold text-base font-['Cairo'] text-[#0b1b2b] dark:text-white flex items-center gap-2">
                 <Check className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                <span>التطبيقات والخطوات السلوكية والعملية</span>
+                <span>الجانب العملي والتطبيقي: «ماذا أفعل بعد أن فهمت هذا؟»</span>
               </h3>
               <ul className="space-y-2.5 text-sm sm:text-base text-stone-700 dark:text-stone-300 leading-relaxed">
                 {content.practicalApplications.map((app, i) => (
@@ -470,9 +712,27 @@ export const GeneratedContentViewer: React.FC<GeneratedContentViewerProps> = ({
             </div>
           )}
 
-          {/* Conclusion */}
+          {/* 6. Reflection Questions (أسئلة التدبر والنقاش) */}
+          {content.reflectionQuestions && content.reflectionQuestions.length > 0 && (
+            <div className="p-6 rounded-2xl bg-amber-50/60 dark:bg-[#122438]/40 border border-amber-200/50 dark:border-amber-900/40 space-y-3">
+              <h3 className="font-bold text-base font-['Cairo'] text-[#0b1b2b] dark:text-[#dfc27e] flex items-center gap-2">
+                <Lightbulb className="w-5 h-5 text-[#94762e] dark:text-[#dfc27e]" />
+                <span>أسئلة ومحاور للتفكر والمدارسة الأسرية وحلقات العلم:</span>
+              </h3>
+              <ul className="space-y-2 text-sm sm:text-base text-stone-700 dark:text-stone-300">
+                {content.reflectionQuestions.map((q, qIdx) => (
+                  <li key={qIdx} className="flex items-start gap-2">
+                    <span className="text-[#94762e] dark:text-[#dfc27e] font-bold">؟</span>
+                    <span>{renderText(q)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* 7. Conclusion */}
           {content.conclusion && (
-            <div className="space-y-2 pt-2 border-t border-stone-100 dark:border-stone-800">
+            <div className="space-y-2 pt-4 border-t border-stone-100 dark:border-stone-800">
               <h3 className="text-sm font-bold font-['Cairo'] text-[#94762e] dark:text-[#dfc27e]">
                 الخاتمة وثمرة المادة
               </h3>
@@ -482,7 +742,7 @@ export const GeneratedContentViewer: React.FC<GeneratedContentViewerProps> = ({
             </div>
           )}
 
-          {/* Dua */}
+          {/* 8. Dua */}
           {content.dua && (
             <div className="p-5 rounded-2xl bg-[#c8a962]/10 border border-[#c8a962]/30 space-y-2">
               <h3 className="text-xs font-bold font-['Cairo'] text-[#94762e] dark:text-[#dfc27e]">
@@ -494,17 +754,7 @@ export const GeneratedContentViewer: React.FC<GeneratedContentViewerProps> = ({
             </div>
           )}
 
-          {/* Dua */}
-          {content.dua && (
-            <div className="p-5 rounded-2xl bg-[#c8a962]/10 border border-[#c8a962]/30 text-center space-y-1">
-              <span className="text-xs font-bold text-[#94762e] dark:text-[#dfc27e] block">دعاء ختامي مقترح</span>
-              <p className="text-base sm:text-lg font-bold text-[#0b1b2b] dark:text-white leading-relaxed">
-                {content.dua}
-              </p>
-            </div>
-          )}
-
-          {/* References & Verification Notes */}
+          {/* 9. References & Verification Notes */}
           {(content.references?.length > 0 || content.verificationNotes?.length > 0) && (
             <div className="pt-6 border-t border-stone-200 dark:border-stone-800 text-xs text-stone-500 dark:text-stone-400 space-y-3">
               {content.references?.length > 0 && (
@@ -536,35 +786,63 @@ export const GeneratedContentViewer: React.FC<GeneratedContentViewerProps> = ({
           )}
         </article>
 
-        {/* AI Quick Transformation Actions Panel */}
-        <div className="mt-8 p-6 rounded-3xl bg-white dark:bg-[#0c1825] border border-stone-200 dark:border-stone-800 shadow-sm space-y-5 no-print">
+        {/* AI Multi-Product Transformation Actions Panel */}
+        <div className="mt-8 p-6 rounded-3xl bg-white dark:bg-[#0c1825] border border-stone-200 dark:border-stone-800 shadow-sm space-y-6 no-print text-right">
           <div>
             <div className="flex items-center gap-2 text-xs font-bold text-[#94762e] dark:text-[#dfc27e] font-['Cairo'] mb-1">
               <Sparkles className="w-4 h-4" />
-              <span>إعادة تشكيل وتحوير المادة بالذكاء الاصطناعي</span>
+              <span>محرك تحويل المادة إلى منتجات دعوية متعددة (Material → Many Products)</span>
             </div>
             <h3 className="font-bold text-lg font-['Cairo'] text-[#0b1b2b] dark:text-white">
-              أوامر سريعة لتعديل المحتوى
+              اشتقاق منتجات جديدة وتعميق تحريري
             </h3>
+            <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
+              انقر على أي خيار لتحويل أفكار هذا المقال إلى خطبة، درس، سيناريو، منشورات، أو خطة عمل، مع الحفاظ على الأمانة العلمية.
+            </p>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            {quickActions.map((action) => (
-              <button
-                key={action.id}
-                disabled={isEditing}
-                onClick={() => handleApplyAction(action.id, action.label)}
-                className="px-3.5 py-2 rounded-xl bg-stone-100 dark:bg-[#08121d] hover:bg-stone-200 dark:hover:bg-[#122438] text-xs font-semibold text-stone-800 dark:text-stone-200 border border-stone-200 dark:border-stone-700 transition-colors disabled:opacity-50 cursor-pointer"
-              >
-                {action.label}
-              </button>
-            ))}
+          {/* Group 1: Derivative Products */}
+          <div className="space-y-2">
+            <span className="text-xs font-bold text-stone-700 dark:text-stone-300 block">
+              1. تحويل المادة إلى قوالب دعوية مشتقة:
+            </span>
+            <div className="flex flex-wrap gap-2">
+              {derivativeActions.map((action) => (
+                <button
+                  key={action.id}
+                  disabled={isEditing}
+                  onClick={() => handleApplyAction(action.id, action.label)}
+                  className="px-3.5 py-2 rounded-xl bg-stone-100 dark:bg-[#08121d] hover:bg-[#c8a962]/15 hover:border-[#c8a962] text-xs font-semibold text-stone-800 dark:text-stone-200 border border-stone-200 dark:border-stone-700 transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  {action.label}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* Conversational Follow-up Input */}
+          {/* Group 2: Editorial Refinements */}
+          <div className="space-y-2 pt-2 border-t border-stone-100 dark:border-stone-800">
+            <span className="text-xs font-bold text-stone-700 dark:text-stone-300 block">
+              2. الإثراء والتدقيق التحريري والشرعي:
+            </span>
+            <div className="flex flex-wrap gap-2">
+              {editorialActions.map((action) => (
+                <button
+                  key={action.id}
+                  disabled={isEditing}
+                  onClick={() => handleApplyAction(action.id, action.label)}
+                  className="px-3.5 py-2 rounded-xl bg-stone-100 dark:bg-[#08121d] hover:bg-[#c8a962]/15 hover:border-[#c8a962] text-xs font-semibold text-stone-800 dark:text-stone-200 border border-stone-200 dark:border-stone-700 transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  {action.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Conversational Custom Instruction Input */}
           <form onSubmit={handleCustomInstructionSubmit} className="pt-4 border-t border-stone-100 dark:border-stone-800">
             <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-2">
-              طلب تعديل مخصص (مثال: «اجعل المقدمة أقوى»، «أضف 3 نقاط للشباب»):
+              طلب تعديل أو إضافة مخصصة (مثال: «أضف أثر ابن مسعود في الخشوع»، «ركّز على تحديات الآباء في الهواتف»):
             </label>
             <div className="flex gap-2">
               <input
